@@ -280,6 +280,18 @@
     color: #fff;
   }
   
+  .admin-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background-color: #2a2a2a;
+    border-radius: 6px;
+  }
+  
+  .admin-section h2 {
+    color: #00ffc8;
+    margin-bottom: 1rem;
+  }
+  
   .admin-form {
     display: grid;
     gap: 1rem;

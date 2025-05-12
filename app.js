@@ -7,6 +7,22 @@ const signoutBtn = document.getElementById('signoutBtn');
 const closeBtn = document.querySelector('.close');
 const loginForm = document.getElementById('loginForm');
 const signupForm = document.getElementById('signupForm');
+const musicBtn = document.getElementById('musicBtn');
+const bgMusic = document.getElementById('bgMusic');
+
+// Music Control
+let isMusicPlaying = false;
+
+musicBtn.addEventListener('click', () => {
+    if (isMusicPlaying) {
+        bgMusic.pause();
+        musicBtn.textContent = '🎵';
+    } else {
+        bgMusic.play();
+        musicBtn.textContent = '🔊';
+    }
+    isMusicPlaying = !isMusicPlaying;
+});
 
 // Navigation
 document.getElementById('homeLink').addEventListener('click', () => loadPage('home'));
@@ -262,21 +278,45 @@ async function loadAdminPanel() {
     }
     content.innerHTML = `
         <div class="admin-panel">
-            <h1>Add a Car</h1>
-            <form id="adminForm" class="admin-form">
-                <input type="text" id="carName" placeholder="Car Name" required>
-                <input type="number" id="carPrice" placeholder="Price" required>
-                <input type="file" id="carImage" accept="image/*" required>
-                <button type="submit">Add Car</button>
-            </form>
+            <h1>Admin Panel</h1>
+            <div class="admin-section">
+                <h2>Add a Car</h2>
+                <form id="adminForm" class="admin-form">
+                    <input type="text" id="carName" placeholder="Car Name" required>
+                    <input type="number" id="carPrice" placeholder="Price" required>
+                    <input type="file" id="carImage" accept="image/*" required>
+                    <button type="submit">Add Car</button>
+                </form>
+            </div>
+            <div class="admin-section">
+                <h2>Upload Background Music</h2>
+                <form id="musicForm" class="admin-form">
+                    <input type="file" id="musicFile" accept="audio/mp3" required>
+                    <button type="submit">Upload Music</button>
+                </form>
+            </div>
         </div>
     `;
+
     document.getElementById('adminForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('carName').value;
         const price = document.getElementById('carPrice').value;
         const imageFile = document.getElementById('carImage').files[0];
         await addCar(name, price, imageFile);
+        loadMarketplace();
+    });
+
+    document.getElementById('musicForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const musicFile = document.getElementById('musicFile').files[0];
+        try {
+            const url = await uploadBackgroundMusic(musicFile);
+            document.getElementById('bgMusic').src = url;
+            alert('Background music uploaded successfully!');
+        } catch (error) {
+            alert('Error uploading music: ' + error.message);
+        }
     });
 }
 
@@ -305,6 +345,19 @@ async function addCar(name, price, imageFile) {
         loadMarketplace();
     } catch (error) {
         alert('Error adding car: ' + error.message);
+    }
+}
+
+async function uploadBackgroundMusic(musicFile) {
+    try {
+        const ref = storage.ref('music/background-music.mp3');
+        await ref.put(musicFile);
+        const url = await ref.getDownloadURL();
+        console.log('Music uploaded successfully! URL:', url);
+        return url;
+    } catch (error) {
+        console.error('Error uploading music:', error);
+        throw error;
     }
 }
 
