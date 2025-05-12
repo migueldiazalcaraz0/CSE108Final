@@ -18,14 +18,14 @@ document.getElementById('adminLink').addEventListener('click', () => loadAdminPa
 // Auth Modal
 loginBtn.addEventListener('click', () => {
     authModal.style.display = 'block';
-    document.getElementById('loginForm').style.display = 'block';
-    document.getElementById('signupForm').style.display = 'none';
+    loginForm.style.display = 'block';
+    signupForm.style.display = 'none';
 });
 
 signupBtn.addEventListener('click', () => {
     authModal.style.display = 'block';
-    document.getElementById('loginForm').style.display = 'none';
-    document.getElementById('signupForm').style.display = 'block';
+    loginForm.style.display = 'none';
+    signupForm.style.display = 'block';
 });
 
 closeBtn.addEventListener('click', () => {
@@ -37,7 +37,7 @@ loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = loginForm.querySelector('input[type="email"]').value;
     const password = loginForm.querySelector('input[type="password"]').value;
-    
+
     try {
         await auth.signInWithEmailAndPassword(email, password);
         authModal.style.display = 'none';
@@ -51,10 +51,9 @@ signupForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = signupForm.querySelector('input[type="email"]').value;
     const password = signupForm.querySelector('input[type="password"]').value;
-    
+
     try {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        // Create user document with initial balance
         await db.collection('users').doc(userCredential.user.uid).set({
             balance: 0,
             ownedCars: []
@@ -77,7 +76,6 @@ signoutBtn.addEventListener('click', async () => {
     loadPage('home');
 });
 
-// Update UI based on auth state
 function updateUI() {
     const user = auth.currentUser;
     if (user) {
@@ -93,11 +91,17 @@ function updateUI() {
     }
 }
 
-// Page Loading Functions
 async function loadPage(page) {
     switch(page) {
         case 'home':
-            content.innerHTML = '<h1>Welcome to Car Marketplace</h1>';
+            content.innerHTML = `
+                <div class="hero-card">
+                    <h1>🚗 Welcome to Car Marketplace</h1>
+                    <p>Buy, earn, and showcase your dream garage.</p>
+                    <button class="auth-btn" onclick="loadPage('marketplace')">Explore Cars</button>
+                    <button class="auth-btn" onclick="loadPage('earn')">Earn Coins</button>
+                </div>
+            `;
             break;
         case 'marketplace':
             await loadMarketplace();
@@ -111,7 +115,6 @@ async function loadPage(page) {
     }
 }
 
-// Marketplace Functions
 async function loadMarketplace() {
     const cars = await db.collection('cars').get();
     content.innerHTML = `
@@ -133,22 +136,23 @@ async function loadMarketplace() {
     `;
 }
 
-// Earn Page Functions
 async function loadEarnPage() {
     let balance = 0;
     if (auth.currentUser) {
-        const userDoc = await db.collection('users').doc(auth.currentUser.uid).get();
-        const userData = userDoc.data();
-        balance = userData ? userData.balance : 0;
+        const doc = await db.collection('users').doc(auth.currentUser.uid).get();
+        balance = doc.data()?.balance || 0;
     }
-    content.innerHTML = `
+
+    coins = balance;
+
+    const html = `
         <div class="earn-container">
             <h1>Earn Coins</h1>
-            <div class="coins-display">Coins: <span id="coinCount">${balance}</span></div>
+            <div class="coins-display">Coins: <span id="coinCount">${coins}</span></div>
             <button class="click-button" onclick="earnCoin()">Click to Earn!</button>
         </div>
     `;
-    coins = balance; // Sync local variable with Firestore
+    content.innerHTML = html;
 }
 
 let coins = 0;
@@ -156,12 +160,14 @@ let coins = 0;
 function earnCoin() {
     coins++;
     updateCoinDisplay();
-    // Update user's balance in Firebase
+
     if (auth.currentUser) {
         db.collection('users').doc(auth.currentUser.uid).update({
             balance: firebase.firestore.FieldValue.increment(1)
         });
     }
+
+    spawnCoinBurst();
 }
 
 function updateCoinDisplay() {
@@ -171,7 +177,19 @@ function updateCoinDisplay() {
     }
 }
 
-// Profile Functions
+function spawnCoinBurst() {
+    for (let i = 0; i < 6; i++) {
+        const coin = document.createElement('img');
+        coin.src = 'https://cdn-icons-png.flaticon.com/512/138/138281.png';
+        coin.className = 'coin-burst';
+        coin.style.left = `${50 + Math.random() * 20 - 10}%`;
+        coin.style.animationDelay = `${i * 0.1}s`;
+        document.body.appendChild(coin);
+
+        setTimeout(() => coin.remove(), 2000);
+    }
+}
+
 async function loadProfile() {
     if (!auth.currentUser) {
         content.innerHTML = '<h1>Please log in to view your profile</h1>';
@@ -200,7 +218,6 @@ async function loadProfile() {
     `;
 }
 
-// Purchase Function
 async function purchaseCar(carId) {
     if (!auth.currentUser) {
         alert('Please log in to purchase cars');
@@ -229,37 +246,6 @@ async function purchaseCar(carId) {
         }
     } else {
         alert('Not enough coins!');
-    }
-}
-
-// Admin Functions
-async function addCar(name, price, imageFile) {
-    try {
-        const metadata = {
-            contentType: imageFile.type,
-            customMetadata: {
-                'name': name,
-                'price': price
-            }
-        };
-        
-        const ref = storage.ref('cars/' + imageFile.name);
-        const snapshot = await ref.put(imageFile, metadata);
-        const downloadURL = await snapshot.ref.getDownloadURL();
-        
-        // Add car to Firestore
-        await db.collection('cars').add({
-            name: name,
-            price: parseInt(price),
-            imageUrl: downloadURL,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        alert('Car added successfully!');
-        loadMarketplace();
-    } catch (error) {
-        console.error('Full error:', error);
-        alert('Error adding car: ' + error.message);
     }
 }
 
@@ -294,9 +280,33 @@ async function loadAdminPanel() {
     });
 }
 
-// Make functions available globally
-window.purchaseCar = purchaseCar;
-window.earnCoin = earnCoin;
+async function addCar(name, price, imageFile) {
+    try {
+        const metadata = {
+            contentType: imageFile.type,
+            customMetadata: {
+                'name': name,
+                'price': price
+            }
+        };
 
-// Initialize the app
-loadPage('home'); 
+        const ref = storage.ref('cars/' + imageFile.name);
+        const snapshot = await ref.put(imageFile, metadata);
+        const downloadURL = await snapshot.ref.getDownloadURL();
+
+        await db.collection('cars').add({
+            name: name,
+            price: parseInt(price),
+            imageUrl: downloadURL,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        alert('Car added successfully!');
+        loadMarketplace();
+    } catch (error) {
+        alert('Error adding car: ' + error.message);
+    }
+}
+
+// Start
+loadPage('home');
