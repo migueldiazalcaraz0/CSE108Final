@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firebase Storage Test</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+</head>
+<body>
+  <h2>Firebase Storage Upload Test</h2>
+  <input type="file" id="fileInput" />
+  <button onclick="upload()">Upload</button>
+  <div id="result"></div>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDD7CYqRQa84QVVgyiltx5Oo_3bgGRJc-4",
+      authDomain: "cse1082nd.firebaseapp.com",
+      projectId: "cse1082nd",
+      storageBucket: "cse1082nd.firebasestorage.app",
+      messagingSenderId: "62272277889",
+      appId: "1:62272277889:web:d4be2dd7b65d8be72a6c80",
+      measurementId: "G-C5RYNPFRQW"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const storage = firebase.storage();
+
+    function upload() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) {
+        document.getElementById('result').innerText = "Please select a file.";
+        return;
+      }
+      const ref = storage.ref('test/' + file.name);
+      ref.put(file)
+        .then(() => document.getElementById('result').innerText = 'Upload success!')
+        .catch(e => document.getElementById('result').innerText = 'Error: ' + e);
+    }
+  </script>
+</body>
+</html> 

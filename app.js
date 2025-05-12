@@ -3,10 +3,10 @@ const content = document.getElementById('content');
 const authModal = document.getElementById('authModal');
 const loginBtn = document.getElementById('loginBtn');
 const signupBtn = document.getElementById('signupBtn');
+const signoutBtn = document.getElementById('signoutBtn');
 const closeBtn = document.querySelector('.close');
 const loginForm = document.getElementById('loginForm');
 const signupForm = document.getElementById('signupForm');
-const signoutBtn = document.getElementById('signoutBtn');
 
 // Navigation
 document.getElementById('homeLink').addEventListener('click', () => loadPage('home'));
@@ -71,6 +71,12 @@ auth.onAuthStateChanged((user) => {
     updateUI();
 });
 
+signoutBtn.addEventListener('click', async () => {
+    await auth.signOut();
+    updateUI();
+    loadPage('home');
+});
+
 // Update UI based on auth state
 function updateUI() {
     const user = auth.currentUser;
@@ -97,7 +103,7 @@ async function loadPage(page) {
             await loadMarketplace();
             break;
         case 'earn':
-            loadEarnPage();
+            await loadEarnPage();
             break;
         case 'profile':
             await loadProfile();
@@ -128,15 +134,21 @@ async function loadMarketplace() {
 }
 
 // Earn Page Functions
-function loadEarnPage() {
+async function loadEarnPage() {
+    let balance = 0;
+    if (auth.currentUser) {
+        const userDoc = await db.collection('users').doc(auth.currentUser.uid).get();
+        const userData = userDoc.data();
+        balance = userData ? userData.balance : 0;
+    }
     content.innerHTML = `
         <div class="earn-container">
             <h1>Earn Coins</h1>
-            <div class="coins-display">Coins: <span id="coinCount">0</span></div>
+            <div class="coins-display">Coins: <span id="coinCount">${balance}</span></div>
             <button class="click-button" onclick="earnCoin()">Click to Earn!</button>
         </div>
     `;
-    updateCoinDisplay();
+    coins = balance; // Sync local variable with Firestore
 }
 
 let coins = 0;
@@ -222,26 +234,31 @@ async function purchaseCar(carId) {
 
 // Admin Functions
 async function addCar(name, price, imageFile) {
-    if (!auth.currentUser) return;
-
     try {
-        // Upload image to Firebase Storage
-        const storageRef = storage.ref();
-        const imageRef = storageRef.child(`cars/${imageFile.name}`);
-        await imageRef.put(imageFile);
-        const imageUrl = await imageRef.getDownloadURL();
-
+        const metadata = {
+            contentType: imageFile.type,
+            customMetadata: {
+                'name': name,
+                'price': price
+            }
+        };
+        
+        const ref = storage.ref('cars/' + imageFile.name);
+        const snapshot = await ref.put(imageFile, metadata);
+        const downloadURL = await snapshot.ref.getDownloadURL();
+        
         // Add car to Firestore
         await db.collection('cars').add({
-            name,
+            name: name,
             price: parseInt(price),
-            imageUrl,
-            addedBy: auth.currentUser.uid,
-            addedAt: firebase.firestore.FieldValue.serverTimestamp()
+            imageUrl: downloadURL,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-
+        
         alert('Car added successfully!');
+        loadMarketplace();
     } catch (error) {
+        console.error('Full error:', error);
         alert('Error adding car: ' + error.message);
     }
 }
@@ -274,8 +291,6 @@ async function loadAdminPanel() {
         const price = document.getElementById('carPrice').value;
         const imageFile = document.getElementById('carImage').files[0];
         await addCar(name, price, imageFile);
-        alert('Car added!');
-        loadMarketplace();
     });
 }
 
@@ -284,10 +299,4 @@ window.purchaseCar = purchaseCar;
 window.earnCoin = earnCoin;
 
 // Initialize the app
-loadPage('home');
-
-signoutBtn.addEventListener('click', async () => {
-    await auth.signOut();
-    updateUI();
-    loadPage('home');
-}); 
+loadPage('home'); 
